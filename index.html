@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8" />
@@ -9,6 +10,7 @@
 <title>特富野餐廳 · 營運管理</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <style>
@@ -76,8 +78,11 @@ input,select,textarea{width:100%;background:var(--white);border:1px solid var(--
 .month-bar{display:flex;gap:8px;align-items:center}.month-bar select{width:auto}
 .empty{color:var(--muted);text-align:center;padding:24px 0;font-size:13px}
 #loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:50vh;gap:12px;color:var(--text-light);font-size:14px}
+.export-bar{display:flex;gap:8px;margin-top:10px}
+.export-bar .btn{flex:1;font-size:12px;padding:7px 8px}
 @media(max-width:360px){.kpi-val{font-size:14px}.stat-val{font-size:13px}}
 </style>
+
 </head>
 
 <body>
@@ -128,12 +133,31 @@ input,select,textarea{width:100%;background:var(--white);border:1px solid var(--
       <button class="tab-btn" onclick="switchReportTab('yearly',this)">年總覽</button>
       <button class="tab-btn" onclick="switchReportTab('compare',this)">跨年比較</button>
     </div>
-    <div id="report-monthly"><div class="card"><select id="rp-year" onchange="renderReports()"></select></div><div class="card" id="rp-monthly-list"></div></div>
-    <div id="report-yearly" style="display:none"><div class="card"><select id="rp-year2" onchange="renderReports()"></select></div><div class="card grid-2" id="rp-year-kpis"></div><div class="card" id="rp-year-list"></div></div>
-    <div id="report-compare" style="display:none">
-      <div class="card"><div class="row"><div class="col"><label>年份 A</label><select id="rp-cmp1" onchange="renderReports()"></select></div><div class="col"><label>年份 B</label><select id="rp-cmp2" onchange="renderReports()"></select></div></div></div>
-      <div class="card" id="rp-cmp-list"></div>
-    </div>
+
+```
+<!-- 匯出區塊 -->
+<div class="card">
+  <div class="card-title">⬇️ 匯出試算表</div>
+  <div style="font-size:11px;color:var(--text-light);margin-bottom:8px">匯出後可直接用 Excel 或 Google 試算表開啟</div>
+  <div class="export-bar">
+    <button class="btn btn-ghost" onclick="exportSalesCSV()">💰 營收 CSV</button>
+    <button class="btn btn-ghost" onclick="exportExpensesCSV()">📦 支出 CSV</button>
+    <button class="btn btn-ghost" onclick="exportPayrollCSV()">👥 薪資 CSV</button>
+  </div>
+  <div style="margin-top:8px">
+    <button class="btn btn-primary btn-full" onclick="exportAllCSV()">📊 匯出全部（ZIP）</button>
+  </div>
+  <div id="export-hint" style="font-size:11px;color:var(--green);margin-top:6px;text-align:center;display:none">✓ 已下載</div>
+</div>
+
+<div id="report-monthly"><div class="card"><select id="rp-year" onchange="renderReports()"></select></div><div class="card" id="rp-monthly-list"></div></div>
+<div id="report-yearly" style="display:none"><div class="card"><select id="rp-year2" onchange="renderReports()"></select></div><div class="card grid-2" id="rp-year-kpis"></div><div class="card" id="rp-year-list"></div></div>
+<div id="report-compare" style="display:none">
+  <div class="card"><div class="row"><div class="col"><label>年份 A</label><select id="rp-cmp1" onchange="renderReports()"></select></div><div class="col"><label>年份 B</label><select id="rp-cmp2" onchange="renderReports()"></select></div></div></div>
+  <div class="card" id="rp-cmp-list"></div>
+</div>
+```
+
   </div>
 </div>
 
@@ -373,6 +397,78 @@ window.renderReports=function(){
   }
 };
 
+// ── 匯出功能 ──────────────────────────────────
+
+// 欄位值含逗號或換行時要加引號
+function escapeCSV(val){
+  const s=String(val==null?"":val);
+  return s.includes(",")||s.includes("\n")||s.includes('"')?`"${s.replace(/"/g,'""')}"`:s;
+}
+
+// 下載單一 CSV（含 BOM，Excel 中文不亂碼）
+function downloadCSV(rows,filename){
+  const csv=rows.map(r=>r.map(escapeCSV).join(",")).join("\n");
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
+  link.download=filename;
+  link.click();
+  showExportHint();
+}
+
+function showExportHint(){
+  const el=document.getElementById("export-hint");
+  el.style.display="block";
+  setTimeout(()=>el.style.display="none",2500);
+}
+
+// 營收 CSV：全部資料，按日期排序
+window.exportSalesCSV=function(){
+  const rows=[["日期","客數","桌數","用餐收入","伴手禮收入","合計","備註"]];
+  Object.entries(DATA.sales||{})
+    .sort(([a],[b])=>a.localeCompare(b))
+    .forEach(([,r])=>{
+      const total=(+r.dining||0)+(+r.souvenir||0);
+      rows.push([r.date,r.guests||0,r.tables||"",r.dining||0,r.souvenir||0,total,r.note||""]);
+    });
+  downloadCSV(rows,"特富野餐廳_營收.csv");
+};
+
+// 支出 CSV：DATA.expenses 是 { "2026-04": [...] }
+window.exportExpensesCSV=function(){
+  const rows=[["日期","廠商","品項","食材費","人事費","其他費","合計","付款方式"]];
+  Object.values(DATA.expenses||{})
+    .flat()
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .forEach(r=>{
+      const total=(+r.food||0)+(+r.labor||0)+(+r.other||0);
+      rows.push([r.date,r.vendor||"",r.item||"",r.food||0,r.labor||0,r.other||0,total,r.payment||""]);
+    });
+  downloadCSV(rows,"特富野餐廳_支出.csv");
+};
+
+// 薪資 CSV：DATA.payroll 是 { "2026-03": [...] }
+window.exportPayrollCSV=function(){
+  const rows=[["月份","員工","本薪","加班時數","加班費","獎金","扣款","應發薪資","勞健保自付","實領薪資"]];
+  Object.entries(DATA.payroll||{})
+    .sort(([a],[b])=>a.localeCompare(b))
+    .forEach(([mk,list])=>{
+      (list||[]).forEach(p=>{
+        rows.push([mk,p.name,p.baseSalary,p.overtimeHours||0,p.overtimePay||0,p.bonus||0,p.deduction||0,p.grossPay,p.laborInsurance,p.netPay]);
+      });
+    });
+  downloadCSV(rows,"特富野餐廳_薪資.csv");
+};
+
+// 全部匯出：三個檔依序下載（間隔 300ms 避免瀏覽器攔截）
+window.exportAllCSV=function(){
+  exportSalesCSV();
+  setTimeout(exportExpensesCSV,300);
+  setTimeout(exportPayrollCSV,600);
+};
+
+// ── Modal ──────────────────────────────────────
+
 let modalMode="",editPayrollKey="",editPayrollIdx=-1;
 window.openModal=function(mode){
   modalMode=mode;
@@ -425,5 +521,6 @@ window.savePayroll=function(){
   saveData();closeModal();renderAll();
 };
 </script>
+
 </body>
 </html>
