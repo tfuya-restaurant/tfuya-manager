@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="特富野餐廳" />
+<title>特富野餐廳 · 營運管理</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f5ede3;--card:#fdf8f3;--border:#e8d8c8;
+  --accent:#c4956a;--accent-dark:#9e7350;--accent-light:#f0dcc8;
+  --text:#4a3728;--text-light:#8a6e5a;--muted:#c9b5a5;
+  --green:#5a8f6a;--green-bg:#e8f5ec;
+  --red:#b85555;--red-bg:#fde8e8;
+  --yellow:#b89a3a;--yellow-bg:#fdf6e0;
+  --white:#fffcf9
+}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",serif;color:var(--text);min-height:100vh;padding-bottom:74px}
+#header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px 10px;position:sticky;top:0;z-index:100}
+#header h1{font-size:18px;color:var(--accent-dark);letter-spacing:.5px}
+#header p{font-size:11px;color:var(--text-light);margin-top:2px}
+#sync-status{font-size:10px;padding:3px 8px;border-radius:10px;white-space:nowrap}
+.sync-ok{background:var(--green-bg);color:var(--green)}
+.sync-err{background:var(--red-bg);color:var(--red)}
+#nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:100}
+.nav-btn{flex:1;padding:9px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:9.5px;font-family:inherit}
+.nav-btn.active{color:var(--accent-dark);font-weight:700}
+.nav-icon{font-size:18px}
+.page{padding:14px 14px 0;display:none}
+.page.active{display:block}
+.card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px}
+.card-title{font-size:13px;font-weight:700;color:var(--accent-dark);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr}
+.kpi{background:var(--bg);border-radius:9px;padding:10px 8px;text-align:center}
+.kpi-val{font-size:16px;font-weight:700;color:var(--accent-dark);line-height:1.2;word-break:break-word}
+.kpi-label{font-size:10px;color:var(--text-light);margin-top:3px}
+.stat-cell{text-align:center;padding:10px 6px}
+.stat-val{font-size:14px;font-weight:700;color:var(--accent-dark)}
+.stat-sub{font-size:10px;color:var(--text-light);margin-top:2px}
+label{font-size:11px;color:var(--text-light);margin-bottom:3px;display:block}
+input,select,textarea{width:100%;background:var(--white);border:1px solid var(--border);border-radius:7px;padding:8px 9px;font-size:13px;color:var(--text);font-family:inherit;outline:none;appearance:none;-webkit-appearance:none}
+.row{display:flex;gap:8px;margin-bottom:8px}.col{flex:1}.col-2{flex:2}
+.btn{border-radius:7px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600;border:none}
+.btn-primary{background:var(--accent);color:#fff}.btn-ghost{background:var(--white);color:var(--accent-dark);border:1px solid var(--border)}
+.btn-danger{background:var(--red);color:#fff}.btn-sm{padding:4px 10px;font-size:12px}.btn-full{width:100%}
+.btn-icon{background:none;border:none;cursor:pointer;padding:2px 4px;font-size:16px}
+.tabs{display:flex;background:var(--card);border-radius:10px;border:1px solid var(--border);margin-bottom:12px;overflow:hidden}
+.tab-btn{flex:1;padding:9px 4px;background:none;border:none;cursor:pointer;font-size:12px;font-family:inherit;color:var(--text-light)}
+.tab-btn.active{background:var(--accent);color:#fff;font-weight:700}
+.list-item{padding:9px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.list-item:last-child{border-bottom:none}
+.item-main{font-size:13px;font-weight:600}.item-sub{font-size:11px;color:var(--text-light);margin-top:2px}
+.item-note{font-size:11px;color:var(--accent);margin-top:1px}.item-amount{font-size:14px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
+.item-actions{display:flex;align-items:center;gap:6px}
+.badge{border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;display:inline-block}
+.badge-green{background:var(--green-bg);color:var(--green)}.badge-red{background:var(--red-bg);color:var(--red)}.badge-yellow{background:var(--yellow-bg);color:var(--yellow)}
+.profit-box{border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.profit-pos{background:var(--green-bg)}.profit-neg{background:var(--red-bg)}
+.profit-label{font-size:13px;font-weight:700}.profit-val-pos{font-size:15px;font-weight:700;color:var(--green)}.profit-val-neg{font-size:15px;font-weight:700;color:var(--red)}
+.bar-wrap{background:var(--border);border-radius:4px;height:5px;overflow:hidden;margin:5px 0}.bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
+.divider{border-bottom:1px solid var(--border);margin:10px 0}
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(74,55,40,.4);z-index:200;align-items:flex-end}
+#modal-overlay.open{display:flex}
+#modal-box{background:var(--card);border-radius:16px 16px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:18px}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal-title{font-size:15px;font-weight:700;color:var(--accent-dark)}
+.modal-close{background:none;border:none;font-size:22px;color:var(--text-light);cursor:pointer;padding:2px 6px}
+.month-bar{display:flex;gap:8px;align-items:center}.month-bar select{width:auto}
+.empty{color:var(--muted);text-align:center;padding:24px 0;font-size:13px}
+#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:50vh;gap:12px;color:var(--text-light);font-size:14px}
+@media(max-width:360px){.kpi-val{font-size:14px}.stat-val{font-size:13px}}
+</style>
+</head>
+
+<body>
+<div id="loading"><div style="font-size:40px">☕</div><div>載入中…</div></div>
+
+<div id="header" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+    <div><h1>特富野餐廳</h1><p>Tfuya Restaurant · 營運管理系統</p></div>
+    <span id="sync-status" class="sync-ok">● 連線中</span>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div id="page-overview" class="page active">
+    <div class="card">
+      <div class="month-bar"><select id="ov-year" onchange="renderOverview()"></select><select id="ov-month" onchange="renderOverview()"></select></div>
+      <div style="font-size:11px;color:var(--text-light);text-align:center;margin-top:6px" id="ov-title"></div>
+    </div>
+    <div class="card grid-2" id="ov-kpis"></div>
+    <div class="card" id="ov-profit"></div>
+    <div class="card" id="ov-health"></div>
+    <div class="card" id="ov-daily"></div>
+  </div>
+
+  <div id="page-sales" class="page">
+    <div class="card"><div class="month-bar"><select id="sl-year" onchange="renderSales()"></select><select id="sl-month" onchange="renderSales()"></select><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openModal('sales')">+ 新增</button></div></div>
+    <div class="card grid-3" id="sl-totals" style="gap:0"></div>
+    <div class="card" id="sl-list"></div>
+  </div>
+
+  <div id="page-expenses" class="page">
+    <div class="card"><div class="month-bar"><select id="ex-year" onchange="renderExpenses()"></select><select id="ex-month" onchange="renderExpenses()"></select><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openModal('expense')">+ 新增</button></div></div>
+    <div class="card grid-3" id="ex-totals" style="gap:0"></div>
+    <div class="card" style="text-align:center;padding:10px 14px" id="ex-grand"></div>
+    <div class="card" id="ex-vendors" style="display:none"></div>
+    <div class="card" id="ex-list"></div>
+  </div>
+
+  <div id="page-payroll" class="page">
+    <div class="card"><div class="month-bar"><select id="py-year" onchange="renderPayroll()"></select><select id="py-month" onchange="renderPayroll()"></select><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openModal('payroll')">+ 新增</button></div></div>
+    <div class="card grid-2" id="py-totals"></div>
+    <div class="card" id="py-list"></div>
+  </div>
+
+  <div id="page-reports" class="page">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchReportTab('monthly',this)">月報表</button>
+      <button class="tab-btn" onclick="switchReportTab('yearly',this)">年總覽</button>
+      <button class="tab-btn" onclick="switchReportTab('compare',this)">跨年比較</button>
+    </div>
+    <div id="report-monthly"><div class="card"><select id="rp-year" onchange="renderReports()"></select></div><div class="card" id="rp-monthly-list"></div></div>
+    <div id="report-yearly" style="display:none"><div class="card"><select id="rp-year2" onchange="renderReports()"></select></div><div class="card grid-2" id="rp-year-kpis"></div><div class="card" id="rp-year-list"></div></div>
+    <div id="report-compare" style="display:none">
+      <div class="card"><div class="row"><div class="col"><label>年份 A</label><select id="rp-cmp1" onchange="renderReports()"></select></div><div class="col"><label>年份 B</label><select id="rp-cmp2" onchange="renderReports()"></select></div></div></div>
+      <div class="card" id="rp-cmp-list"></div>
+    </div>
+  </div>
+</div>
+
+<nav id="nav" style="display:none">
+  <button class="nav-btn active" onclick="switchPage('overview',this)"><span class="nav-icon">🏠</span>總覽</button>
+  <button class="nav-btn" onclick="switchPage('sales',this)"><span class="nav-icon">💰</span>營收</button>
+  <button class="nav-btn" onclick="switchPage('expenses',this)"><span class="nav-icon">📦</span>支出</button>
+  <button class="nav-btn" onclick="switchPage('payroll',this)"><span class="nav-icon">👥</span>薪資</button>
+  <button class="nav-btn" onclick="switchPage('reports',this)"><span class="nav-icon">📈</span>報表</button>
+</nav>
+
+<div id="modal-overlay" onclick="closeModalOutside(event)">
+  <div id="modal-box">
+    <div class="modal-head"><span class="modal-title" id="modal-title"></span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyBX7locnv67MlyH_lVdMriJjyuMvt_uRQo",
+  authDomain:"tfuya-restaurant.firebaseapp.com",
+  databaseURL:"https://tfuya-restaurant-default-rtdb.firebaseio.com",
+  projectId:"tfuya-restaurant",
+  storageBucket:"tfuya-restaurant.firebasestorage.app",
+  messagingSenderId:"168376866451",
+  appId:"1:168376866451:web:bc4fdba8d25aaae45c9f66"
+};
+
+let db=null;
+let DATA={sales:{},expenses:{},payroll:{}};
+
+const PRELOAD={"sales":{"2026-04-20_1000":{"date":"2026-04-20","guests":17,"tables":"","dining":7200,"souvenir":0,"note":"餐廳*4民宿*13"},"2026-04-21_1001":{"date":"2026-04-21","guests":8,"tables":"","dining":800,"souvenir":0,"note":"文健站"},"2026-04-22_1002":{"date":"2026-04-22","guests":12,"tables":"","dining":1200,"souvenir":0,"note":"文健站"},"2026-04-21_1003":{"date":"2026-04-21","guests":45,"tables":"","dining":16000,"souvenir":0,"note":"boc晚宴*40民宿*5 以上民宿結算"},"2026-04-23_1004":{"date":"2026-04-23","guests":33,"tables":"","dining":11300,"souvenir":5600,"note":"咖啡豆*16"},"2026-04-24_1005":{"date":"2026-04-24","guests":8,"tables":"","dining":3700,"souvenir":1050,"note":"咖啡豆*3"},"2026-04-24_1006":{"date":"2026-04-24","guests":10,"tables":"","dining":1000,"souvenir":0,"note":"文健站"},"2026-04-25_1007":{"date":"2026-04-25","guests":15,"tables":"","dining":1500,"souvenir":0,"note":"文健站"},"2026-04-25_1008":{"date":"2026-04-25","guests":4,"tables":"","dining":1600,"souvenir":0,"note":"民宿*4 民宿未結"},"2026-04-26_1009":{"date":"2026-04-26","guests":21,"tables":"","dining":9800,"souvenir":0,"note":"餐廳*17民宿*3 民宿未結"},"2026-04-27_1010":{"date":"2026-04-27","guests":9,"tables":"","dining":900,"souvenir":0,"note":"文健站"},"2026-04-27_1011":{"date":"2026-04-27","guests":2,"tables":"","dining":1000,"souvenir":0,"note":"餐廳*2"}},"expenses":{"2026-04":[{"id":2000,"date":"2026-04-20","vendor":"寶橋","item":"餐廳菜","food":1900,"labor":0,"other":0,"payment":"現金"},{"id":2001,"date":"2026-04-20","vendor":"","item":"葉自強烤肉出餐","food":0,"labor":2500,"other":0,"payment":"現金"},{"id":2002,"date":"2026-04-21","vendor":"寶橋","item":"餐廳菜","food":3430,"labor":0,"other":0,"payment":"現金"},{"id":2003,"date":"2026-04-21","vendor":"里佳","item":"雞蛋","food":2000,"labor":0,"other":0,"payment":"現金"},{"id":2004,"date":"2026-04-22","vendor":"南田市場","item":"餐廳菜","food":4746,"labor":0,"other":0,"payment":"現金"},{"id":2005,"date":"2026-04-22","vendor":"寶橋","item":"餐廳菜","food":220,"labor":0,"other":0,"payment":"現金"},{"id":2006,"date":"2026-04-22","vendor":"","item":"葉自強幫忙","food":0,"labor":1500,"other":0,"payment":"現金"},{"id":2007,"date":"2026-04-22","vendor":"龍瀚書局","item":"桌上壓克力板3","food":0,"labor":0,"other":171,"payment":"現金"},{"id":2008,"date":"2026-04-25","vendor":"寶橋","item":"餐廳菜","food":3840,"labor":0,"other":0,"payment":"現金"},{"id":2009,"date":"2026-04-26","vendor":"寶橋","item":"餐廳菜","food":1180,"labor":0,"other":0,"payment":"現金"},{"id":2010,"date":"2026-04-26","vendor":"方白雲","item":"獵人包","food":800,"labor":0,"other":0,"payment":"現金"},{"id":2011,"date":"2026-04-26","vendor":"？","item":"","food":650,"labor":0,"other":0,"payment":"現金"},{"id":2012,"date":"2026-04-26","vendor":"","item":"梁元君","food":0,"labor":700,"other":0,"payment":"現金"}]},"payroll":{"2026-03":[{"name":"楊秀琴","baseSalary":30300,"overtimeHours":0,"overtimeRate":196,"overtimePay":0,"bonus":0,"deduction":0,"laborInsurance":1063,"grossPay":30300,"netPay":29237}]}};
+
+const fmt=n=>{const x=Number(n);return isNaN(x)?"0":x.toLocaleString("zh-TW")};
+const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+const thisYear=()=>new Date().getFullYear();
+const thisMonth=()=>new Date().getMonth()+1;
+const mkKey=(y,m)=>`${y}-${String(m).padStart(2,"0")}`;
+const MONTHS=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+function makeYearOptions(selId,selected){
+  const sel=document.getElementById(selId); if(!sel)return;
+  sel.innerHTML="";
+  for(let y=thisYear()+1;y>=thisYear()-4;y--){const o=document.createElement("option");o.value=y;o.textContent=y+"年";sel.appendChild(o)}
+  sel.value=selected||thisYear();
+}
+function makeMonthOptions(selId,selected){
+  const sel=document.getElementById(selId); if(!sel)return;
+  sel.innerHTML="";
+  MONTHS.forEach((m,i)=>{const o=document.createElement("option");o.value=i+1;o.textContent=m;sel.appendChild(o)});
+  sel.value=selected||thisMonth();
+}
+function buildSelectors(){
+  ["ov","sl","ex","py"].forEach(p=>{makeYearOptions(p+"-year");makeMonthOptions(p+"-month")});
+  makeYearOptions("rp-year");makeYearOptions("rp-year2");makeYearOptions("rp-cmp1");makeYearOptions("rp-cmp2",thisYear()-1);
+}
+function showApp(){
+  document.getElementById("loading").style.display="none";
+  document.getElementById("header").style.display="block";
+  document.getElementById("app").style.display="block";
+  document.getElementById("nav").style.display="flex";
+}
+function setSync(text,ok=true){
+  const el=document.getElementById("sync-status"); if(!el)return;
+  el.textContent=text; el.className=ok?"sync-ok":"sync-err";
+}
+
+function connectFirebase(config){
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(config);
+    db=firebase.database();
+    db.ref("tfuya").on("value",snap=>{
+      const val=snap.val();
+      if(val){ DATA={sales:{},expenses:{},payroll:{},...val}; }
+      else{ DATA=JSON.parse(JSON.stringify(PRELOAD)); db.ref("tfuya").set(DATA); }
+      renderAll(); setSync("● 已同步",true);
+    },err=>{setSync("● 讀取失敗",false); alert("Firebase 讀取失敗："+err.message)});
+    db.ref(".info/connected").on("value",s=>setSync(s.val()?"● 已同步":"● 離線",!!s.val()));
+  }catch(e){setSync("● 連線失敗",false); alert("Firebase 連線失敗："+e.message)}
+}
+function saveData(){
+  if(!db)return;
+  db.ref("tfuya").set(DATA).then(()=>setSync("● 已同步",true)).catch(e=>{setSync("● 儲存失敗",false); alert("儲存失敗："+e.message)});
+}
+
+window.addEventListener("load",()=>{buildSelectors();showApp();connectFirebase(FIREBASE_CONFIG)});
+
+window.switchPage=function(name,btn){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById("page-"+name).classList.add("active");
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  renderAll();
+};
+
+let currentReportTab="monthly";
+window.switchReportTab=function(tab,btn){
+  currentReportTab=tab;
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");
+  document.getElementById("report-monthly").style.display=tab==="monthly"?"block":"none";
+  document.getElementById("report-yearly").style.display=tab==="yearly"?"block":"none";
+  document.getElementById("report-compare").style.display=tab==="compare"?"block":"none";
+  renderReports();
+};
+
+function renderAll(){renderOverview();renderSales();renderExpenses();renderPayroll();renderReports()}
+
+window.renderOverview=function(){
+  const y=Number(document.getElementById("ov-year").value),m=Number(document.getElementById("ov-month").value),mk=mkKey(y,m);
+  document.getElementById("ov-title").textContent=y+"年"+m+"月 · 營運概況";
+  const salesRecs=Object.entries(DATA.sales||{}).filter(([k])=>k.startsWith(mk+"-"));
+  const totalRev=salesRecs.reduce((a,[,r])=>a+(+r.dining||0)+(+r.souvenir||0),0);
+  const totalGuests=salesRecs.reduce((a,[,r])=>a+(+r.guests||0),0);
+  const workDays=[...new Set(salesRecs.map(([k])=>k.split("_")[0]))].length;
+  const avgPer=totalGuests>0?Math.round(totalRev/totalGuests):0;
+  const avgDay=workDays>0?Math.round(totalRev/workDays):0;
+  const expRecs=DATA.expenses?.[mk]||[];
+  const foodCost=expRecs.reduce((a,r)=>a+(+r.food||0),0);
+  const laborCost=expRecs.reduce((a,r)=>a+(+r.labor||0),0);
+  const otherCost=expRecs.reduce((a,r)=>a+(+r.other||0),0);
+  const payrollTotal=(DATA.payroll?.[mk]||[]).reduce((a,p)=>a+(+p.netPay||0),0);
+  const totalCost=foodCost+laborCost+otherCost+payrollTotal;
+  const profit=totalRev-totalCost;
+  const foodRatio=totalRev>0?(foodCost/totalRev*100).toFixed(1):0;
+  const laborRatio=totalRev>0?((laborCost+payrollTotal)/totalRev*100).toFixed(1):0;
+  const netMargin=totalRev>0?(profit/totalRev*100).toFixed(1):0;
+
+  document.getElementById("ov-kpis").innerHTML=[
+    ["NT$"+fmt(totalRev),"💰 營業收入"],[fmt(totalGuests)+" 人","👥 總客數"],["NT$"+fmt(avgPer),"🍽 平均客單價"],[workDays+" 天","📅 工作天數"]
+  ].map(([v,l])=>`<div class="kpi"><div class="kpi-val">${v}</div><div class="kpi-label">${l}</div></div>`).join("");
+
+  const isPos=profit>=0;
+  document.getElementById("ov-profit").innerHTML=`
+    <div class="card-title">📊 損益分析</div>
+    ${[["食材成本",foodCost],["人事費用（臨時）",laborCost],["其他費用",otherCost],["薪資（實領）",payrollTotal]].map(([l,v])=>`
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-light)">${l}</span><span>NT$${fmt(v)}</span></div>`).join("")}
+    <div class="profit-box ${isPos?"profit-pos":"profit-neg"}"><span class="profit-label">營業淨利</span><span class="${isPos?"profit-val-pos":"profit-val-neg"}">${isPos?"+":""}${fmt(profit)} 元</span></div>
+    <div style="font-size:11px;color:var(--text-light);text-align:right;margin-top:4px">淨利率 ${netMargin}%｜日均 NT$${fmt(avgDay)}</div>`;
+
+  const costRating=(v,lo,hi)=>v<=hi?(v<=lo?"green":"yellow"):"red";
+  const getText=c=>c==="green"?"✓ 健康":c==="yellow"?"⚠ 尚可":"✗ 過高";
+  document.getElementById("ov-health").innerHTML=`
+    <div class="card-title">⚠️ 成本結構健康度</div>
+    ${[["食材成本率",foodRatio,28,35,"建議 28%–35%"],["人事成本率",laborRatio,25,30,"建議 25%–30%"],["淨利率",netMargin,10,100,"建議 10%↑",true]].map(([lbl,val,lo,hi,hint,inv])=>{
+      const c=inv?(+val>=lo?"green":"red"):costRating(+val,lo,hi);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+        <div><div style="font-size:13px">${lbl}</div><div style="font-size:10px;color:var(--text-light)">${hint}</div></div>
+        <div style="text-align:right"><div style="font-size:14px;font-weight:700;color:var(--accent-dark)">${val}%</div><span class="badge badge-${c}">${getText(c)}</span></div></div>`;
+    }).join("")}`;
+
+  const dayRecs=Object.entries(DATA.sales||{}).filter(([k])=>k.startsWith(mk+"-")).sort(([a],[b])=>b.localeCompare(a));
+  document.getElementById("ov-daily").innerHTML=`
+    <div class="card-title">📋 當月每日記錄</div>
+    ${dayRecs.length===0?'<div class="empty">本月尚無記錄</div>':dayRecs.map(([key,r])=>{
+      const total=(+r.dining||0)+(+r.souvenir||0),date=key.split("_")[0];
+      return `<div class="list-item"><div><div class="item-main">${date} <span style="font-size:11px;color:var(--text-light);font-weight:400">· ${r.guests||0}人</span></div>${r.note?`<div class="item-note">📝 ${r.note}</div>`:""}</div><span class="item-amount">NT$${fmt(total)}</span></div>`;
+    }).join("")}`;
+};
+
+window.renderSales=function(){
+  const y=Number(document.getElementById("sl-year").value),m=Number(document.getElementById("sl-month").value),mk=mkKey(y,m);
+  const recs=Object.entries(DATA.sales||{}).filter(([k])=>k.startsWith(mk+"-")).sort(([a],[b])=>b.localeCompare(a));
+  const totalRev=recs.reduce((a,[,r])=>a+(+r.dining||0)+(+r.souvenir||0),0);
+  const totalDine=recs.reduce((a,[,r])=>a+(+r.dining||0),0);
+  const totalSouv=recs.reduce((a,[,r])=>a+(+r.souvenir||0),0);
+  const totalGuests=recs.reduce((a,[,r])=>a+(+r.guests||0),0);
+  document.getElementById("sl-totals").innerHTML=[
+    ["NT$"+fmt(totalRev),"總營業額"],["NT$"+fmt(totalDine),"用餐收入"],["NT$"+fmt(totalSouv),"伴手禮"]
+  ].map(([v,l],i)=>`<div class="stat-cell" style="${i<2?"border-right:1px solid var(--border)":""}"><div class="stat-val">${v}</div><div class="stat-sub">${l}</div></div>`).join("");
+  document.getElementById("sl-list").innerHTML=`
+    <div class="card-title">📋 本月記錄 · ${totalGuests}人</div>
+    ${recs.length===0?'<div class="empty">本月尚無記錄</div>':recs.map(([key,r])=>{
+      const total=(+r.dining||0)+(+r.souvenir||0),date=key.split("_")[0];
+      return `<div class="list-item"><div style="flex:1"><div class="item-main">${date} <span style="font-size:11px;color:var(--text-light);font-weight:400">${r.guests||0}人${r.tables?" "+r.tables+"桌":""}</span></div><div class="item-sub">${r.dining?"用餐 $"+fmt(r.dining):""}${r.souvenir?" 伴手禮 $"+fmt(r.souvenir):""}</div>${r.note?`<div class="item-note">📝 ${r.note}</div>`:""}</div><div class="item-actions"><span class="item-amount">NT$${fmt(total)}</span><button class="btn-icon" style="color:var(--red)" onclick="deleteSale('${key}')">🗑</button></div></div>`;
+    }).join("")}`;
+};
+window.deleteSale=function(key){if(!confirm("確定刪除？"))return;delete DATA.sales[key];saveData();renderAll()};
+
+window.renderExpenses=function(){
+  const y=Number(document.getElementById("ex-year").value),m=Number(document.getElementById("ex-month").value),mk=mkKey(y,m);
+  const list=DATA.expenses?.[mk]||[];
+  const totalFood=list.reduce((a,r)=>a+(+r.food||0),0),totalLabor=list.reduce((a,r)=>a+(+r.labor||0),0),totalOther=list.reduce((a,r)=>a+(+r.other||0),0),grand=totalFood+totalLabor+totalOther;
+  document.getElementById("ex-totals").innerHTML=[
+    ["🥬 食材",fmt(totalFood)],["👤 人事",fmt(totalLabor)],["📎 其他",fmt(totalOther)]
+  ].map(([l,v],i)=>`<div class="stat-cell" style="${i<2?"border-right:1px solid var(--border)":""}"><div class="stat-val">NT$${v}</div><div class="stat-sub">${l}</div></div>`).join("");
+  document.getElementById("ex-grand").innerHTML=`<span style="font-size:12px;color:var(--text-light)">本月總支出：</span><span style="font-size:16px;font-weight:700;color:var(--red)">NT$${fmt(grand)}</span>`;
+  const vendorMap={};list.forEach(r=>{if(r.vendor)vendorMap[r.vendor]=(vendorMap[r.vendor]||0)+(+r.food||0)+(+r.labor||0)+(+r.other||0)});
+  const vEl=document.getElementById("ex-vendors");
+  if(Object.keys(vendorMap).length){vEl.style.display="block";vEl.innerHTML='<div class="card-title">🏪 廠商統計</div>'+Object.entries(vendorMap).sort(([,a],[,b])=>b-a).map(([v,a])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${v}</span><span style="font-weight:600;color:var(--accent-dark)">NT$${fmt(a)}</span></div>`).join("")}else{vEl.style.display="none"}
+  document.getElementById("ex-list").innerHTML=`
+    <div class="card-title">📋 支出明細</div>
+    ${list.length===0?'<div class="empty">本月尚無支出記錄</div>':[...list].reverse().map(r=>{
+      const total=(+r.food||0)+(+r.labor||0)+(+r.other||0);
+      return `<div class="list-item"><div style="flex:1"><div style="display:flex;align-items:center;gap:6px"><span class="item-main">${r.date}</span>${r.vendor?`<span style="font-size:11px;color:var(--accent)">${r.vendor}</span>`:""}</div>${r.item?`<div style="font-size:12px;margin-top:1px">${r.item}</div>`:""}<div class="item-sub">${r.food?"食材 $"+fmt(r.food)+" ":""}${r.labor?"人事 $"+fmt(r.labor)+" ":""}${r.other?"其他 $"+fmt(r.other)+" ":""} · ${r.payment||""}</div></div><div class="item-actions"><span class="item-amount">NT$${fmt(total)}</span><button class="btn-icon" style="color:var(--red)" onclick="deleteExpense('${mk}',${r.id})">🗑</button></div></div>`;
+    }).join("")}`;
+};
+window.deleteExpense=function(mk,id){if(!confirm("確定刪除？"))return;if(!DATA.expenses)DATA.expenses={};DATA.expenses[mk]=(DATA.expenses[mk]||[]).filter(r=>r.id!==id);saveData();renderAll()};
+
+window.renderPayroll=function(){
+  const y=Number(document.getElementById("py-year").value),m=Number(document.getElementById("py-month").value),mk=mkKey(y,m);
+  const list=DATA.payroll?.[mk]||[];
+  const totalNet=list.reduce((a,p)=>a+(+p.netPay||0),0),totalGross=list.reduce((a,p)=>a+(+p.grossPay||0),0);
+  document.getElementById("py-totals").innerHTML=[["NT$"+fmt(totalNet),"💵 實領薪資總額"],["NT$"+fmt(totalGross),"📄 應發薪資總額"]].map(([v,l])=>`<div class="kpi"><div class="kpi-val">${v}</div><div class="kpi-label">${l}</div></div>`).join("");
+  document.getElementById("py-list").innerHTML=`
+    <div class="card-title">👥 薪資明細</div>
+    ${list.length===0?'<div class="empty">尚無薪資記錄</div>':list.map((p,i)=>`
+      <div class="list-item"><div><div class="item-main">${p.name}</div><div class="item-sub">本薪 $${fmt(p.baseSalary)}${+p.overtimeHours>0?" + 加班費 $"+fmt(p.overtimePay)+"（"+p.overtimeHours+"時）":""}${+p.bonus>0?" + 獎金 $"+fmt(p.bonus):""}${+p.deduction>0?" - 扣款 $"+fmt(p.deduction):""}</div><div class="item-sub">應發 $${fmt(p.grossPay)} - 勞健保 $${fmt(p.laborInsurance)}</div></div><div class="item-actions"><div style="text-align:right"><div style="font-size:15px;font-weight:700;color:var(--accent-dark)">NT$${fmt(p.netPay)}</div><div style="font-size:10px;color:var(--text-light)">實領</div></div><button class="btn-icon" style="color:var(--accent)" onclick="editPayroll('${mk}',${i})">✏️</button><button class="btn-icon" style="color:var(--red)" onclick="deletePayroll('${mk}',${i})">🗑</button></div></div>`).join("")}`;
+};
+window.deletePayroll=function(mk,i){if(!confirm("確定刪除？"))return;DATA.payroll[mk].splice(i,1);saveData();renderAll()};
+
+function getStats(y,m){
+  const mk=mkKey(y,m),sr=Object.entries(DATA.sales||{}).filter(([k])=>k.startsWith(mk+"-"));
+  const rev=sr.reduce((a,[,r])=>a+(+r.dining||0)+(+r.souvenir||0),0),guests=sr.reduce((a,[,r])=>a+(+r.guests||0),0);
+  const er=DATA.expenses?.[mk]||[];
+  const food=er.reduce((a,r)=>a+(+r.food||0),0),labor=er.reduce((a,r)=>a+(+r.labor||0),0),other=er.reduce((a,r)=>a+(+r.other||0),0),pay=(DATA.payroll?.[mk]||[]).reduce((a,p)=>a+(+p.netPay||0),0);
+  const workDays=[...new Set(sr.map(([k])=>k.split("_")[0]))].length,cost=food+labor+other+pay;
+  return{rev,guests,food,labor,other,pay,cost,profit:rev-cost,workDays,avg:workDays>0?Math.round(rev/workDays):0};
+}
+window.renderReports=function(){
+  if(currentReportTab==="monthly"){
+    const y=Number(document.getElementById("rp-year").value),yd=MONTHS.map((_,i)=>getStats(y,i+1)),maxRev=Math.max(...yd.map(d=>d.rev),1);
+    document.getElementById("rp-monthly-list").innerHTML=`
+      <div class="card-title">📅 ${y}年 各月營業概況</div>
+      ${yd.map((d,i)=>{const prev=i>0?yd[i-1]:null,growth=prev&&prev.rev>0?Math.round((d.rev-prev.rev)/prev.rev*100):null,isPos=d.profit>=0;return `
+        <div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:700;width:28px">${i+1}月</span>${growth!==null&&d.rev>0?`<span class="badge badge-${growth>=0?"green":"red"}">${growth>=0?"+":""}${growth}%</span>`:""}</div><div class="bar-wrap"><div class="bar-fill" style="width:${d.rev/maxRev*100}%"></div></div><div style="font-size:11px;color:var(--text-light)">${d.workDays}天 · ${d.guests}人 · 日均 $${fmt(d.avg)}</div></div><div style="text-align:right;margin-left:12px"><div style="font-size:14px;font-weight:700;color:var(--accent-dark)">NT$${fmt(d.rev)}</div><div style="font-size:11px;color:${isPos?"var(--green)":"var(--red)"}">利潤 ${isPos?"+":""}${fmt(d.profit)}</div></div></div></div>`}).join("")}`;
+  }
+  if(currentReportTab==="yearly"){
+    const y=Number(document.getElementById("rp-year2").value),yd=MONTHS.map((_,i)=>getStats(y,i+1)),yRev=yd.reduce((a,d)=>a+d.rev,0),yProfit=yd.reduce((a,d)=>a+d.profit,0);
+    document.getElementById("rp-year-kpis").innerHTML=[["NT$"+fmt(yRev),"年度總營業額"],["NT$"+fmt(yProfit),"年度淨利"],["NT$"+fmt(Math.round(yRev/12)),"月均營業額"],[yd.filter(d=>d.rev>0).length+"個月","有收益月份"]].map(([v,l])=>`<div class="kpi"><div class="kpi-val">${v}</div><div class="kpi-label">${l}</div></div>`).join("");
+    document.getElementById("rp-year-list").innerHTML=`<div class="card-title">💰 ${y}年 月份收支明細</div>${yd.map((d,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;color:${d.rev>0?"var(--text)":"var(--muted)"};width:28px">${i+1}月</span><span style="font-size:13px">NT$${fmt(d.rev)}</span><span style="font-size:12px;color:var(--text-light)">支出 $${fmt(d.cost)}</span><span style="font-size:12px;font-weight:600;color:${d.profit>=0?"var(--green)":"var(--red)"}">${d.profit>=0?"+":""}${fmt(d.profit)}</span></div>`).join("")}`;
+  }
+  if(currentReportTab==="compare"){
+    const y1=Number(document.getElementById("rp-cmp1").value),y2=Number(document.getElementById("rp-cmp2").value),d1all=MONTHS.map((_,i)=>getStats(y1,i+1)),d2all=MONTHS.map((_,i)=>getStats(y2,i+1));
+    const tot1=d1all.reduce((a,d)=>a+d.rev,0),p1=d1all.reduce((a,d)=>a+d.profit,0),tot2=d2all.reduce((a,d)=>a+d.rev,0),p2=d2all.reduce((a,d)=>a+d.profit,0);
+    document.getElementById("rp-cmp-list").innerHTML=`<div class="card-title">📊 月份對比：${y1} vs ${y2}</div>${MONTHS.map((_,i)=>{const d1=d1all[i],d2=d2all[i],g=d2.rev>0?Math.round((d1.rev-d2.rev)/d2.rev*100):null;return `<div style="padding:9px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:600;width:28px">${i+1}月</span><div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--text-light)">${y2}</div><div style="font-size:13px">NT$${fmt(d2.rev)}</div></div><div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--text-light)">${y1}</div><div style="font-size:13px;font-weight:700;color:var(--accent-dark)">NT$${fmt(d1.rev)}</div></div><div style="width:55px;text-align:right">${g!==null&&(d1.rev>0||d2.rev>0)?`<span class="badge badge-${g>=0?"green":"red"}">${g>=0?"+":""}${g}%</span>`:""}</div></div></div>`}).join("")}<div class="divider"></div>${[[y1,tot1,p1],[y2,tot2,p2]].map(([y,t,p])=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0"><span style="font-weight:700">${y}年 年度總計</span><span>NT$${fmt(t)} · 利潤 <span style="color:${p>=0?"var(--green)":"var(--red)"}">${p>=0?"+":""}${fmt(p)}</span></span></div>`).join("")}`;
+  }
+};
+
+let modalMode="",editPayrollKey="",editPayrollIdx=-1;
+window.openModal=function(mode){
+  modalMode=mode;
+  const overlay=document.getElementById("modal-overlay"),title=document.getElementById("modal-title"),body=document.getElementById("modal-body");
+  overlay.classList.add("open");
+  if(mode==="sales"){
+    title.textContent="新增每日營收";
+    body.innerHTML=`<div class="row"><div class="col-2"><label>日期</label><input type="date" id="m-date" value="${todayStr()}"></div><div class="col"><label>客數</label><input type="number" id="m-guests" placeholder="人數"></div><div class="col"><label>桌數</label><input type="number" id="m-tables" placeholder="桌"></div></div><div class="row"><div class="col"><label>用餐收入（元）</label><input type="number" id="m-dining" placeholder="0"></div><div class="col"><label>伴手禮收入（元）</label><input type="number" id="m-souvenir" placeholder="0"></div></div><div style="margin-bottom:8px"><label>備註</label><input id="m-note" placeholder="例：餐廳*4民宿*13、BOC晚宴…"></div><button class="btn btn-primary btn-full" onclick="saveSale()">儲存</button>`;
+  }
+  if(mode==="expense"){
+    title.textContent="新增支出記錄";
+    body.innerHTML=`<div class="row"><div class="col"><label>日期</label><input type="date" id="m-date" value="${todayStr()}"></div><div class="col"><label>付款方式</label><select id="m-pay"><option>現金</option><option>轉帳</option><option>信用卡</option></select></div></div><div class="row"><div class="col"><label>廠商/來源</label><input id="m-vendor" placeholder="例：寶橋、南田市場"></div><div class="col"><label>品項說明</label><input id="m-item" placeholder="例：餐廳菜、雞蛋"></div></div><div class="row"><div class="col"><label>食材費用</label><input type="number" id="m-food" placeholder="0"></div><div class="col"><label>人事費用</label><input type="number" id="m-labor" placeholder="0"></div><div class="col"><label>其他費用</label><input type="number" id="m-other" placeholder="0"></div></div><button class="btn btn-primary btn-full" style="margin-top:4px" onclick="saveExpense()">儲存</button>`;
+  }
+  if(mode==="payroll"||mode==="payroll-edit"){
+    const isEdit=mode==="payroll-edit",p=isEdit?(DATA.payroll?.[editPayrollKey]||[])[editPayrollIdx]:null;
+    title.textContent=isEdit?"編輯員工薪資":"新增員工薪資";
+    body.innerHTML=`<div style="margin-bottom:8px"><label>員工姓名</label><input id="m-name" value="${p?p.name:""}"></div><div class="row"><div class="col"><label>月薪本薪</label><input type="number" id="m-base" value="${p?p.baseSalary:30300}"></div><div class="col"><label>加班時數</label><input type="number" step="0.5" id="m-ot" value="${p&&p.overtimeHours?p.overtimeHours:""}"></div></div><div class="row"><div class="col"><label>加班費率（元/時）</label><input type="number" id="m-otrate" value="${p?p.overtimeRate:196}"></div><div class="col"><label>獎金</label><input type="number" id="m-bonus" value="${p&&p.bonus?p.bonus:""}"></div></div><div class="row"><div class="col"><label>扣款</label><input type="number" id="m-ded" value="${p&&p.deduction?p.deduction:""}"></div><div class="col"><label>勞健保自付</label><input type="number" id="m-ins" value="${p?p.laborInsurance:1063}"></div></div><button class="btn btn-primary btn-full" style="margin-top:4px" onclick="savePayroll()">儲存</button>`;
+  }
+};
+window.editPayroll=function(mk,i){editPayrollKey=mk;editPayrollIdx=i;openModal("payroll-edit")};
+window.closeModal=function(){document.getElementById("modal-overlay").classList.remove("open")};
+window.closeModalOutside=function(e){if(e.target.id==="modal-overlay")closeModal()};
+
+window.saveSale=function(){
+  const dining=+document.getElementById("m-dining").value||0,souvenir=+document.getElementById("m-souvenir").value||0;
+  if(!dining&&!souvenir){alert("請輸入至少一項收入金額");return}
+  const date=document.getElementById("m-date").value,key=date+"_"+Date.now();
+  if(!DATA.sales)DATA.sales={};
+  DATA.sales[key]={date,guests:+document.getElementById("m-guests").value||0,tables:document.getElementById("m-tables").value,dining,souvenir,note:document.getElementById("m-note").value};
+  saveData();closeModal();renderAll();
+};
+window.saveExpense=function(){
+  const food=+document.getElementById("m-food").value||0,labor=+document.getElementById("m-labor").value||0,other=+document.getElementById("m-other").value||0;
+  if(!food&&!labor&&!other){alert("請輸入至少一項金額");return}
+  const date=document.getElementById("m-date").value;
+  const mk=date.slice(0,7);
+  if(!DATA.expenses)DATA.expenses={}; if(!DATA.expenses[mk])DATA.expenses[mk]=[];
+  DATA.expenses[mk].push({id:Date.now(),date,vendor:document.getElementById("m-vendor").value,item:document.getElementById("m-item").value,food,labor,other,payment:document.getElementById("m-pay").value});
+  const [yy,mm]=mk.split("-"); document.getElementById("ex-year").value=yy; document.getElementById("ex-month").value=Number(mm);
+  saveData();closeModal();renderAll();
+};
+window.savePayroll=function(){
+  const name=document.getElementById("m-name").value.trim(); if(!name){alert("請輸入員工姓名");return}
+  const base=+document.getElementById("m-base").value||0,ot=+document.getElementById("m-ot").value||0,otRate=+document.getElementById("m-otrate").value||196,bonus=+document.getElementById("m-bonus").value||0,ded=+document.getElementById("m-ded").value||0,ins=+document.getElementById("m-ins").value||1063;
+  const otPay=Math.round(ot*otRate),gross=base+otPay+bonus-ded,net=gross-ins;
+  const entry={name,baseSalary:base,overtimeHours:ot,overtimeRate:otRate,overtimePay:otPay,bonus,deduction:ded,laborInsurance:ins,grossPay:gross,netPay:net};
+  const y=Number(document.getElementById("py-year").value),mo=Number(document.getElementById("py-month").value),mk=mkKey(y,mo);
+  if(!DATA.payroll)DATA.payroll={}; if(!DATA.payroll[mk])DATA.payroll[mk]=[];
+  if(modalMode==="payroll-edit"&&editPayrollIdx>=0)DATA.payroll[editPayrollKey][editPayrollIdx]=entry; else DATA.payroll[mk].push(entry);
+  saveData();closeModal();renderAll();
+};
+</script>
+</body>
+</html>
